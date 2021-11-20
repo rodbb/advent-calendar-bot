@@ -21,6 +21,11 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- feed
+- lens
+- text
+- xml-conduit
+- wreq
 
 library:
   source-dirs: src
@@ -33,6 +38,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
     dependencies:
     - advent-calendar-bot
 
