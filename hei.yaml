@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "advent-calendar-bot:lib"
+
+    - path: "./app/Main.hs"
+      component: "advent-calendar-bot:exe:advent-calendar-bot-exe"
+
+    - path: "./app/Paths_advent_calendar_bot.hs"
+      component: "advent-calendar-bot:exe:advent-calendar-bot-exe"
+
+    - path: "./test"
+      component: "advent-calendar-bot:test:advent-calendar-bot-test"
