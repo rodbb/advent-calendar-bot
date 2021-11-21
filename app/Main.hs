@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -27,20 +28,92 @@ import qualified Network.Mattermost.Types.Internal as Mttrmst
   ( Token (Token),
   )
 import qualified Network.Wreq as Wreq
-import System.Environment (getArgs)
+import Options.Applicative
+  ( ArgumentFields,
+    Mod,
+    OptionFields,
+    Parser,
+    ParserInfo,
+    auto,
+    execParser,
+    fullDesc,
+    header,
+    help,
+    helper,
+    info,
+    long,
+    metavar,
+    option,
+    short,
+    showDefault,
+    strArgument,
+    strOption,
+    value,
+    (<**>),
+  )
 import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
 import Text.Feed.Types (Feed (AtomFeed))
 
+data Args = Args
+  { mttrHost :: Text,
+    mttrPort :: Int,
+    mttrParsonalAccessToken :: String,
+    destChannelId :: Text,
+    feedUri :: String
+  }
+
+cliArgs :: ParserInfo Args
+cliArgs =
+  info (opts <**> helper) $
+    fullDesc
+      <> header "Command to post Qiita Advent Calendar updates to Mattermost"
+  where
+    opts :: Parser Args
+    opts =
+      Args
+        <$> textOption
+          ( long "mttrHost"
+              <> metavar "HOST"
+              <> value "localhost"
+              <> help "Target Mattermost Host name"
+              <> showDefault
+          )
+        <*> option
+          auto
+          ( long "mttrPort"
+              <> metavar "PORT"
+              <> value 8065
+              <> help "Target Mattermost listening Port"
+              <> showDefault
+          )
+        <*> strOption
+          ( long "token"
+              <> short 't'
+              <> metavar "TOKEN"
+              <> help "Parsonal Access Token for create post to Mattermost"
+          )
+        <*> textArgument
+          ( metavar "CHANNEL_ID"
+              <> help "Target Mattermost channel ID to post feed"
+          )
+        <*> strArgument
+          ( metavar "FEED_URL"
+              <> help "Target Qiita Advent Calendar Feed URL"
+          )
+
+    textOption :: Mod OptionFields String -> Parser Text
+    textOption = fmap Txt.pack . strOption
+
+    textArgument :: Mod ArgumentFields String -> Parser Text
+    textArgument = fmap Txt.pack . strArgument
+
 main :: IO ()
 main = do
-  [targetHost, targetPort, mttrParsonalAccessToken, taegetChannelId, feedUri] <- getArgs
-  let mttrHost = Txt.pack targetHost
-  let mttrPort = read targetPort
-  let chanId = Txt.pack taegetChannelId
+  Args {..} <- execParser cliArgs
   res <- Wreq.get feedUri
   let theMsg = renderFeed <$> Import.parseFeedSource (res ^. Wreq.responseBody)
-  mapM_ (postToMattermost MttrInfo {..} chanId) theMsg
+  mapM_ (postToMattermost MttrInfo {..} destChannelId) theMsg
 
 renderFeed :: Feed -> Text
 renderFeed feed = case feed of
