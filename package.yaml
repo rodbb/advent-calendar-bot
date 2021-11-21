@@ -23,6 +23,8 @@ dependencies:
 - base >= 4.7 && < 5
 - feed
 - lens
+- mattermost-api
+- mtl
 - text
 - xml-conduit
 - wreq
