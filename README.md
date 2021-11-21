@@ -1,16 +1,6 @@
 # advent-calendar-bot
 Qiita アドベントカレンダーの更新を Mattermost に投稿するボット
 
-## Task List
-
-- [x] Advent Calendar に投稿された記事一覧を取得する
-    - RSS Feed があるのでそれをダウンロードすればよい
-    - RSS Feed の URL は実行時に指定できるようにする
-- [ ] 前回実行時から新しく投稿されたもの（新規記事一覧）を抜き出す
-- [ ] 新規記事一覧から投稿用メッセージの文面を作る
-- [x] Mattermost にメッセージを投稿する
-    - Host や Channel、アクセストークンは実行時に指定できるようにする
-
 ## Usage
 
 ```
@@ -29,6 +19,16 @@ Available options:
 ```
 
 ## CONTRIBUTING
+
+### Task List
+
+- [x] Advent Calendar に投稿された記事一覧を取得する
+    - RSS Feed があるのでそれをダウンロードすればよい
+    - RSS Feed の URL は実行時に指定できるようにする
+- [ ] 前回実行時から新しく投稿されたもの（新規記事一覧）を抜き出す
+- [ ] 新規記事一覧から投稿用メッセージの文面を作る
+- [x] Mattermost にメッセージを投稿する
+    - Host や Channel、アクセストークンは実行時に指定できるようにする
 
 ### Testing
 
