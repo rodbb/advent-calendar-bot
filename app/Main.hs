@@ -1,54 +1,34 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
-import Control.Lens ((^.))
-import Control.Monad (void)
+import Control.Lens ((^.), (^?))
+import Data.Aeson
+  ( ToJSON,
+    defaultOptions,
+    genericToEncoding,
+    toEncoding,
+    toJSON,
+  )
+import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import qualified Data.Text as Txt
-import qualified Network.Mattermost as Mttrmst
-  ( defaultConnectionPoolConfig,
-    initConnectionData,
-  )
-import qualified Network.Mattermost.Endpoints as Mttrmst
-  ( mmCreatePost,
-  )
-import qualified Network.Mattermost.Types as Mttrmst
-  ( ChannelId (CI),
-    ConnectionType (ConnectHTTP),
-    Hostname,
-    Id (Id),
-    Port,
-    Session (Session, sessConn, sessTok),
-    rawPost,
-  )
-import qualified Network.Mattermost.Types.Internal as Mttrmst
-  ( Token (Token),
-  )
+import GHC.Generics (Generic)
 import qualified Network.Wreq as Wreq
 import Options.Applicative
-  ( ArgumentFields,
-    Mod,
-    OptionFields,
-    Parser,
+  ( Parser,
     ParserInfo,
-    auto,
     execParser,
     fullDesc,
     header,
     help,
     helper,
     info,
-    long,
     metavar,
-    option,
-    short,
-    showDefault,
     strArgument,
-    strOption,
-    value,
     (<**>),
   )
 import qualified Text.Atom.Feed as Atom
@@ -56,10 +36,7 @@ import qualified Text.Feed.Import as Import (parseFeedSource)
 import Text.Feed.Types (Feed (AtomFeed))
 
 data Args = Args
-  { mttrHost :: Text,
-    mttrPort :: Int,
-    mttrParsonalAccessToken :: String,
-    destChannelId :: Text,
+  { mttrWebhookUrl :: String,
     feedUri :: String
   }
 
@@ -72,48 +49,22 @@ cliArgs =
     opts :: Parser Args
     opts =
       Args
-        <$> textOption
-          ( long "mttrHost"
-              <> metavar "HOST"
-              <> value "localhost"
-              <> help "Target Mattermost Host name"
-              <> showDefault
-          )
-        <*> option
-          auto
-          ( long "mttrPort"
-              <> metavar "PORT"
-              <> value 8065
-              <> help "Target Mattermost listening Port"
-              <> showDefault
-          )
-        <*> strOption
-          ( long "token"
-              <> short 't'
-              <> metavar "TOKEN"
-              <> help "Parsonal Access Token for create post to Mattermost"
-          )
-        <*> textArgument
-          ( metavar "CHANNEL_ID"
-              <> help "Target Mattermost channel ID to post feed"
+        <$> strArgument
+          ( metavar "WEBHOOK_URL"
+              <> help "Target Mattermost Incoming Webhook URL"
           )
         <*> strArgument
           ( metavar "FEED_URL"
               <> help "Target Qiita Advent Calendar Feed URL"
           )
 
-    textOption :: Mod OptionFields String -> Parser Text
-    textOption = fmap Txt.pack . strOption
-
-    textArgument :: Mod ArgumentFields String -> Parser Text
-    textArgument = fmap Txt.pack . strArgument
-
 main :: IO ()
 main = do
   Args {..} <- execParser cliArgs
   res <- Wreq.get feedUri
   let theMsg = renderFeed <$> Import.parseFeedSource (res ^. Wreq.responseBody)
-  mapM_ (postToMattermost MttrInfo {..} destChannelId) theMsg
+  ret <- mapM_ (postToMattermost mttrWebhookUrl) theMsg
+  print ret
 
 renderFeed :: Feed -> Text
 renderFeed feed = case feed of
@@ -129,27 +80,15 @@ renderFeed feed = case feed of
     renderAsMarkdown :: [Text] -> Text
     renderAsMarkdown = Txt.unlines . fmap (Txt.append "* ")
 
-type ParsonalAccessToken = String
+type WebhookUrl = String
 
-data MttrInfo = MttrInfo
-  { mttrHost :: Mttrmst.Hostname,
-    mttrPort :: Mttrmst.Port,
-    mttrParsonalAccessToken :: ParsonalAccessToken
-  }
+postToMattermost :: WebhookUrl -> Text -> IO (Maybe ByteString)
+postToMattermost webhookUrl theMsg = do
+  res <- Wreq.post webhookUrl $ toJSON MttrmstMsg {text = theMsg}
+  return (res ^? Wreq.responseBody)
 
-type ChannelId = Text
+newtype MttrmstMsg = MttrmstMsg {text :: Text}
+  deriving (Generic)
 
-postToMattermost :: MttrInfo -> ChannelId -> Text -> IO ()
-postToMattermost MttrInfo {..} channelId theMsg =
-  let sessTok = Mttrmst.Token mttrParsonalAccessToken
-      chanId = Mttrmst.CI (Mttrmst.Id channelId)
-      postObj = Mttrmst.rawPost theMsg chanId
-   in do
-        sessConn <-
-          Mttrmst.initConnectionData
-            mttrHost
-            mttrPort
-            Txt.empty
-            Mttrmst.ConnectHTTP
-            Mttrmst.defaultConnectionPoolConfig
-        void $ Mttrmst.mmCreatePost postObj Mttrmst.Session {..}
+instance ToJSON MttrmstMsg where
+  toEncoding = genericToEncoding defaultOptions

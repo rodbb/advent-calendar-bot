@@ -3,14 +3,7 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages:
-- completed:
-    hackage: mattermost-api-50200.11.0@sha256:dddd577621c09d00d0dc4973bb0424682c7479d36e3341bbf354c6a69b32bfc5,6820
-    pantry-tree:
-      size: 2143
-      sha256: 550407a47f2d22a6e9c9dbe4fddc6094f749184beb21f2464fa724a5866930ab
-  original:
-    hackage: mattermost-api-50200.11.0@sha256:dddd577621c09d00d0dc4973bb0424682c7479d36e3341bbf354c6a69b32bfc5,6820
+packages: []
 snapshots:
 - completed:
     size: 586292
