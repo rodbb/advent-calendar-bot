@@ -61,15 +61,19 @@ cliArgs =
 main :: IO ()
 main = do
   Args {..} <- execParser cliArgs
-  res <- Wreq.get feedUri
-  let theMsg = renderFeed <$> Import.parseFeedSource (res ^. Wreq.responseBody)
-  ret <- mapM_ (postToMattermost mttrWebhookUrl) theMsg
+  feed <- getCalendarFeed feedUri
+  ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed =<< feed)
   print ret
 
-renderFeed :: Feed -> Text
+getCalendarFeed :: String -> IO (Maybe Feed)
+getCalendarFeed feedUri = do
+  res <- Wreq.get feedUri
+  return $ Import.parseFeedSource (res ^. Wreq.responseBody)
+
+renderFeed :: Feed -> Maybe Text
 renderFeed feed = case feed of
-  AtomFeed f -> renderAsMarkdown $ getEntryTitleAsText <$> Atom.feedEntries f
-  _ -> Txt.empty
+  AtomFeed f -> Just $ renderAsMarkdown $ getEntryTitleAsText <$> Atom.feedEntries f
+  _ -> Nothing
   where
     getEntryTitleAsText :: Atom.Entry -> Text
     getEntryTitleAsText entry = case Atom.entryTitle entry of
