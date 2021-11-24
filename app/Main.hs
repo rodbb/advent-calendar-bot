@@ -5,6 +5,7 @@
 
 module Main where
 
+import Control.Exception (catch, throwIO)
 import Control.Lens ((^.), (^?))
 import Data.Aeson
   ( ToJSON,
@@ -16,7 +17,12 @@ import Data.Aeson
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import qualified Data.Text as Txt (unpack, unlines, pack, append)
-import qualified Data.Text.IO as Txt (writeFile)
+import qualified Data.Text.IO as Txt (readFile, writeFile)
+import Data.Time
+  ( ParseTime,
+    defaultTimeLocale,
+    parseTimeM,
+  )
 import GHC.Generics (Generic)
 import qualified Network.Wreq as Wreq
 import Options.Applicative
@@ -32,6 +38,7 @@ import Options.Applicative
     strArgument,
     (<**>),
   )
+import System.IO.Error (isDoesNotExistError)
 import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
 import qualified Text.Feed.Query as Feed
@@ -65,16 +72,27 @@ cacheFileName = ".advent-calandar-bot"
 
 main :: IO ()
 main = do
+  cache <- readCache cacheFileName
   Args {..} <- execParser cliArgs
   feed <- getCalendarFeed feedUri
   ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed =<< feed)
   mapM_ (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate =<< feed
   print ret
 
+readCache :: FilePath -> IO (Maybe Text)
+readCache f =
+  (Just <$> Txt.readFile f) `catch` \e -> do
+    if isDoesNotExistError e
+      then return Nothing
+      else throwIO e
+
 getCalendarFeed :: String -> IO (Maybe Feed)
 getCalendarFeed feedUri = do
   res <- Wreq.get feedUri
   return $ Import.parseFeedSource (res ^. Wreq.responseBody)
+
+parseFeedDate :: (MonadFail m, ParseTime t) => String -> m t
+parseFeedDate = parseTimeM False defaultTimeLocale "%FT%T%Ez"
 
 renderFeed :: Feed -> Maybe Text
 renderFeed feed = case feed of

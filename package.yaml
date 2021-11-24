@@ -27,6 +27,7 @@ dependencies:
 - lens
 - mtl
 - text
+- time
 - xml-conduit
 - wreq
 
