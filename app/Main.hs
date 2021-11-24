@@ -15,7 +15,8 @@ import Data.Aeson
   )
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
-import qualified Data.Text as Txt
+import qualified Data.Text as Txt (unpack, unlines, pack, append)
+import qualified Data.Text.IO as Txt (writeFile)
 import GHC.Generics (Generic)
 import qualified Network.Wreq as Wreq
 import Options.Applicative
@@ -33,6 +34,7 @@ import Options.Applicative
   )
 import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
+import qualified Text.Feed.Query as Feed
 import Text.Feed.Types (Feed (AtomFeed))
 
 data Args = Args
@@ -58,11 +60,15 @@ cliArgs =
               <> help "Target Qiita Advent Calendar Feed URL"
           )
 
+cacheFileName :: String
+cacheFileName = ".advent-calandar-bot"
+
 main :: IO ()
 main = do
   Args {..} <- execParser cliArgs
   feed <- getCalendarFeed feedUri
   ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed =<< feed)
+  mapM_ (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate =<< feed
   print ret
 
 getCalendarFeed :: String -> IO (Maybe Feed)
