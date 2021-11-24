@@ -5,6 +5,7 @@
 
 module Main where
 
+import Control.Applicative ((<|>))
 import Control.Exception (catch, throwIO)
 import Control.Lens ((^.), (^?))
 import Data.Aeson
@@ -15,11 +16,14 @@ import Data.Aeson
     toJSON,
   )
 import Data.ByteString.Lazy (ByteString)
+import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.Text (Text)
-import qualified Data.Text as Txt (unpack, unlines, pack, append)
+import qualified Data.Text as Txt (append, pack, unlines, unpack)
 import qualified Data.Text.IO as Txt (readFile, writeFile)
 import Data.Time
   ( ParseTime,
+    UTCTime,
     defaultTimeLocale,
     parseTimeM,
   )
@@ -75,7 +79,8 @@ main = do
   cache <- readCache cacheFileName
   Args {..} <- execParser cliArgs
   feed <- getCalendarFeed feedUri
-  ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed =<< feed)
+  let cachedDate = parseFeedDate =<< cache
+  ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed cachedDate =<< feed)
   mapM_ (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate =<< feed
   print ret
 
@@ -91,14 +96,28 @@ getCalendarFeed feedUri = do
   res <- Wreq.get feedUri
   return $ Import.parseFeedSource (res ^. Wreq.responseBody)
 
-parseFeedDate :: (MonadFail m, ParseTime t) => String -> m t
-parseFeedDate = parseTimeM False defaultTimeLocale "%FT%T%Ez"
+parseFeedDate :: (MonadFail m, ParseTime t) => Text -> m t
+parseFeedDate = parseTimeM True defaultTimeLocale "%FT%T%Ez" . Txt.unpack
 
-renderFeed :: Feed -> Maybe Text
-renderFeed feed = case feed of
-  AtomFeed f -> Just $ renderAsMarkdown $ getEntryTitleAsText <$> Atom.feedEntries f
+renderFeed :: Maybe UTCTime -> Feed -> Maybe Text
+renderFeed mTime feed = case feed of
+  AtomFeed f ->
+    Atom.feedEntries f
+      & filter isNewEntry
+      <&> getEntryTitleAsText
+      & renderAsMarkdown
+      & Just
   _ -> Nothing
   where
+    isNewEntry :: Atom.Entry -> Bool
+    isNewEntry entry =
+      let pubDate =
+            (parseFeedDate =<< Atom.entryPublished entry)
+              <|> parseFeedDate (Atom.entryUpdated entry)
+       in case mTime of
+            Nothing -> True
+            Just _ -> pubDate > mTime
+
     getEntryTitleAsText :: Atom.Entry -> Text
     getEntryTitleAsText entry = case Atom.entryTitle entry of
       Atom.TextString t -> t
