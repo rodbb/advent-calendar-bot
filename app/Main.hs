@@ -41,8 +41,12 @@ import Options.Applicative
     help,
     helper,
     info,
+    long,
     metavar,
+    showDefault,
     strArgument,
+    strOption,
+    value,
     (<**>),
   )
 import System.IO.Error (isDoesNotExistError)
@@ -57,7 +61,8 @@ import qualified Text.URI as URI (relativeTo, render)
 
 data Args = Args
   { mttrWebhookUrl :: String,
-    feedUri :: String
+    feedUri :: String,
+    templateFilePath :: FilePath
   }
 
 cliArgs :: ParserInfo Args
@@ -77,12 +82,16 @@ cliArgs =
           ( metavar "FEED_URL"
               <> help "Target Qiita Advent Calendar Feed URL"
           )
+        <*> strOption
+          ( long "template"
+              <> metavar "FILE"
+              <> value "templates/default.mustache.md"
+              <> showDefault
+              <> help "Message Template File Path"
+          )
 
 cacheFileName :: String
 cacheFileName = ".advent-calandar-bot"
-
-defaultTemplateFilePath :: String
-defaultTemplateFilePath = "templates/default.mustache.md"
 
 main :: IO ()
 main = do
@@ -96,7 +105,7 @@ main = do
       let cachedDate = parseFeedDate =<< cache
        in runMaybeT $ do
             feed <- MaybeT (getCalendarFeed feedUri)
-            msg <- renderFeed cachedDate feed
+            msg <- renderFeed cachedDate feed templateFilePath
             ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
             MaybeT $ mapM (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate feed
             return ret
@@ -161,9 +170,9 @@ pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
         Nothing -> True
         Just t -> _entryPublished > t
 
-renderFeed :: Maybe UTCTime -> Feed -> MaybeT IO Text
-renderFeed mTime feed = do
-  template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile defaultTemplateFilePath
+renderFeed :: Maybe UTCTime -> Feed -> FilePath -> MaybeT IO Text
+renderFeed mTime feed templatePath = do
+  template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile templatePath
   viewModel <- MaybeT $ return (pickupNewEntryAfter mTime <$> fromFeed feed)
   return (Mstch.substitute template viewModel)
 
