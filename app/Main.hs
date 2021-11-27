@@ -106,6 +106,7 @@ main = do
   case ret of
     Nothing -> Txt.putStr "Something Wrong!"
     Just x0 -> BL.putStr x0
+  putStrLn ""
   where
     go Args {..} =
       runMaybeT $ do
