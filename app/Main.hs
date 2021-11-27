@@ -6,7 +6,7 @@
 
 module Main where
 
-import Control.Applicative ((<|>))
+import Control.Applicative (Alternative, (<|>))
 import Control.Exception (catch, throwIO)
 import Control.Lens ((^.), (^?))
 import Control.Monad.Except (ExceptT (ExceptT))
@@ -22,9 +22,11 @@ import Data.Aeson
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.List (find, uncons)
+import Data.Map.Strict (Map, (!?))
+import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Txt (pack, unpack)
-import qualified Data.Text.IO as Txt (putStr, readFile, writeFile)
+import qualified Data.Text.IO as Txt (putStr, writeFile)
 import Data.Time
   ( ParseTime,
     UTCTime,
@@ -53,7 +55,6 @@ import Options.Applicative
 import System.IO.Error (isDoesNotExistError)
 import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
-import qualified Text.Feed.Query as Feed
 import Text.Feed.Types (Feed (AtomFeed))
 import Text.Mustache ((~>))
 import qualified Text.Mustache as Mstch
@@ -110,29 +111,39 @@ main = do
       runMaybeT $ do
         cached <- liftIO (readCache cachePath)
         feed <- MaybeT (getCalendarFeed feedUri)
-        let advClndr =
-              case parseFeedDate =<< cached of
-                Nothing -> fromFeed feed
-                Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
-        msg <- render templateFilePath =<< MaybeT (return advClndr)
+        advClndr <- MaybeT . return $
+          case cached !? feedUri of
+            Nothing -> fromFeed feed
+            Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
+        msg <- render templateFilePath advClndr
         ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
-        MaybeT $ mapM (Txt.writeFile cachePath) $ Feed.getFeedLastUpdate feed
+        liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
         return ret
 
-readCache :: FilePath -> IO (Maybe Text)
+readCache :: FilePath -> IO (Map String UTCTime)
 readCache f =
-  (Just <$> Txt.readFile f) `catch` \e -> do
+  (read <$> readFile f) `catch` \e -> do
     if isDoesNotExistError e
-      then return Nothing
+      then return mempty
       else throwIO e
+
+updateCache :: String -> Text -> Map String UTCTime -> FilePath -> IO ()
+updateCache url updated cache path =
+  let newCache = Map.alter (const (parseFeedDate updated)) url cache
+   in Txt.writeFile path (Txt.pack $ show newCache)
 
 getCalendarFeed :: String -> IO (Maybe Feed)
 getCalendarFeed feedUri = do
   res <- Wreq.get feedUri
   return $ Import.parseFeedSource (res ^. Wreq.responseBody)
 
-parseFeedDate :: (MonadFail m, ParseTime t) => Text -> m t
-parseFeedDate = parseTimeM True defaultTimeLocale "%FT%T%Ez" . Txt.unpack
+parseFeedDate :: (MonadFail m, Alternative m, ParseTime t) => Text -> m t
+parseFeedDate txt =
+  let str = Txt.unpack txt
+   in parseAs "%FT%T%Ez" str -- format until 2020
+        <|> parseAs "%FT%T%Z" str -- format from 2021
+  where
+    parseAs = parseTimeM True defaultTimeLocale
 
 data AdventCalendar = AdventCalendar
   { _calendarTitle :: Text,
