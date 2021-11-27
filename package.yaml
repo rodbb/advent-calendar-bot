@@ -10,6 +10,9 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 
+data-files:
+- templates/*
+
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
 # category:            Web
@@ -27,8 +30,10 @@ dependencies:
 - lens
 - mtl
 - modern-uri
+- mustache
 - text
 - time
+- transformers
 - xml-conduit
 - wreq
 

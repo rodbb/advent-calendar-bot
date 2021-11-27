@@ -9,6 +9,8 @@ module Main where
 import Control.Applicative ((<|>))
 import Control.Exception (catch, throwIO)
 import Control.Lens ((^.), (^?))
+import Control.Monad.Except (ExceptT (ExceptT))
+import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT), exceptToMaybeT)
 import Data.Aeson
   ( ToJSON,
     defaultOptions,
@@ -17,10 +19,11 @@ import Data.Aeson
     toJSON,
   )
 import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.List (find, uncons)
 import Data.Text (Text)
 import qualified Data.Text as Txt (pack, unpack)
-import qualified Data.Text.IO as Txt (readFile, writeFile)
+import qualified Data.Text.IO as Txt (putStr, readFile, writeFile)
 import Data.Time
   ( ParseTime,
     UTCTime,
@@ -47,6 +50,8 @@ import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
 import qualified Text.Feed.Query as Feed
 import Text.Feed.Types (Feed (AtomFeed))
+import Text.Mustache ((~>))
+import qualified Text.Mustache as Mstch
 import Text.URI (mkURI)
 import qualified Text.URI as URI (relativeTo, render)
 
@@ -76,15 +81,25 @@ cliArgs =
 cacheFileName :: String
 cacheFileName = ".advent-calandar-bot"
 
+defaultTemplateFilePath :: String
+defaultTemplateFilePath = "templates/default.mustache.md"
+
 main :: IO ()
 main = do
   cache <- readCache cacheFileName
-  Args {..} <- execParser cliArgs
-  feed <- getCalendarFeed feedUri
-  let cachedDate = parseFeedDate =<< cache
-  ret <- mapM_ (postToMattermost mttrWebhookUrl) (renderFeed cachedDate =<< feed)
-  mapM_ (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate =<< feed
-  print ret
+  ret <- go cache =<< execParser cliArgs
+  case ret of
+    Nothing -> Txt.putStr "Something Wrong!"
+    Just x0 -> BL.putStr x0
+  where
+    go cache Args {..} =
+      let cachedDate = parseFeedDate =<< cache
+       in runMaybeT $ do
+            feed <- MaybeT (getCalendarFeed feedUri)
+            msg <- renderFeed cachedDate feed
+            ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
+            MaybeT $ mapM (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate feed
+            return ret
 
 readCache :: FilePath -> IO (Maybe Text)
 readCache f =
@@ -109,18 +124,52 @@ data AdventCalendar = AdventCalendar
   }
   deriving (Show)
 
+instance Mstch.ToMustache AdventCalendar where
+  toMustache AdventCalendar {..} =
+    Mstch.object
+      [ "calendarTitle" ~> _calendarTitle,
+        "calendarUrl" ~> _calendarUrl,
+        "calendarUpdate" ~> _calendarUpdate,
+        "calendarEntries" ~> _calendarEntries
+      ]
+
 data CalendarEntry = CalendarEntry
   { _entryTitle :: Text,
-    _entryAuther :: Text,
+    _entryAuthor :: Text,
     _entryUrl :: Text,
     _entrySummary :: Maybe Text,
     _entryPublished :: UTCTime
   }
   deriving (Show)
 
-renderFeed :: Maybe UTCTime -> Feed -> Maybe Text
-renderFeed mTime feed = case feed of
-  AtomFeed f -> renderAsMarkdown . pickupNewEntryAfter mTime <$> fromAtomFeed f
+instance Mstch.ToMustache CalendarEntry where
+  toMustache CalendarEntry {..} =
+    Mstch.object
+      [ "entryTitle" ~> _entryTitle,
+        "entryAuthor" ~> _entryAuthor,
+        "entryUrl" ~> _entryUrl,
+        "entrySummary" ~> _entrySummary
+      ]
+
+pickupNewEntryAfter :: Maybe UTCTime -> AdventCalendar -> AdventCalendar
+pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
+  ac {_calendarEntries = filter isNewEntry _calendarEntries}
+  where
+    isNewEntry :: CalendarEntry -> Bool
+    isNewEntry CalendarEntry {_entryPublished} =
+      case mt of
+        Nothing -> True
+        Just t -> _entryPublished > t
+
+renderFeed :: Maybe UTCTime -> Feed -> MaybeT IO Text
+renderFeed mTime feed = do
+  template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile defaultTemplateFilePath
+  viewModel <- MaybeT $ return (pickupNewEntryAfter mTime <$> fromFeed feed)
+  return (Mstch.substitute template viewModel)
+
+fromFeed :: Feed -> Maybe AdventCalendar
+fromFeed feed = case feed of
+  AtomFeed f -> fromAtomFeed f
   _ -> Nothing
   where
     fromAtomFeed :: Atom.Feed -> Maybe AdventCalendar
@@ -145,13 +194,13 @@ renderFeed mTime feed = case feed of
 
     fromAtomEntry :: Atom.Entry -> Maybe CalendarEntry
     fromAtomEntry e = do
-      (_entryAuther, _) <- uncons $ Atom.personName <$> Atom.entryAuthors e
+      (_entryAuthor, _) <- uncons $ Atom.personName <$> Atom.entryAuthors e
       _entryUrl <- entryUrl e
       _entryPublished <- (parseFeedDate =<< Atom.entryPublished e) <|> parseFeedDate (Atom.entryUpdated e)
       return
         CalendarEntry
           { _entryTitle = getContentAsText (Atom.entryTitle e),
-            _entryAuther,
+            _entryAuthor,
             _entryUrl,
             _entrySummary = Nothing,
             _entryPublished
@@ -162,24 +211,11 @@ renderFeed mTime feed = case feed of
       where
         findAlternate = find (\Atom.Link {linkRel} -> linkRel == Just (Right "alternate"))
 
-    pickupNewEntryAfter :: Maybe UTCTime -> AdventCalendar -> AdventCalendar
-    pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
-      ac {_calendarEntries = filter (isNewEntry mt) _calendarEntries}
-
-    isNewEntry :: Maybe UTCTime -> CalendarEntry -> Bool
-    isNewEntry mt CalendarEntry {_entryPublished} =
-      case mt of
-        Nothing -> True
-        Just t -> _entryPublished > t
-
     getContentAsText :: Atom.TextContent -> Text
     getContentAsText cntnt = case cntnt of
       Atom.TextString t -> t
       Atom.HTMLString t -> t
       t@(Atom.XHTMLString _) -> Txt.pack (Atom.txtToString t)
-
-    renderAsMarkdown :: AdventCalendar -> Text
-    renderAsMarkdown = Txt.pack . show
 
 type WebhookUrl = String
 
