@@ -10,6 +10,7 @@ import Control.Applicative ((<|>))
 import Control.Exception (catch, throwIO)
 import Control.Lens ((^.), (^?))
 import Control.Monad.Except (ExceptT (ExceptT))
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT), exceptToMaybeT)
 import Data.Aeson
   ( ToJSON,
@@ -62,7 +63,8 @@ import qualified Text.URI as URI (relativeTo, render)
 data Args = Args
   { mttrWebhookUrl :: String,
     feedUri :: String,
-    templateFilePath :: FilePath
+    templateFilePath :: FilePath,
+    cachePath :: FilePath
   }
 
 cliArgs :: ParserInfo Args
@@ -89,26 +91,33 @@ cliArgs =
               <> showDefault
               <> help "Message Template File Path"
           )
-
-cacheFileName :: String
-cacheFileName = ".advent-calandar-bot"
+        <*> strOption
+          ( long "cache"
+              <> metavar "FILE"
+              <> value ".advent-calendar-bot"
+              <> showDefault
+              <> help "Feed Updated Date Cache File Path"
+          )
 
 main :: IO ()
 main = do
-  cache <- readCache cacheFileName
-  ret <- go cache =<< execParser cliArgs
+  ret <- go =<< execParser cliArgs
   case ret of
     Nothing -> Txt.putStr "Something Wrong!"
     Just x0 -> BL.putStr x0
   where
-    go cache Args {..} =
-      let cachedDate = parseFeedDate =<< cache
-       in runMaybeT $ do
-            feed <- MaybeT (getCalendarFeed feedUri)
-            msg <- renderFeed cachedDate feed templateFilePath
-            ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
-            MaybeT $ mapM (Txt.writeFile cacheFileName) $ Feed.getFeedLastUpdate feed
-            return ret
+    go Args {..} =
+      runMaybeT $ do
+        cached <- liftIO (readCache cachePath)
+        feed <- MaybeT (getCalendarFeed feedUri)
+        let advClndr =
+              case parseFeedDate =<< cached of
+                Nothing -> fromFeed feed
+                Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
+        msg <- render templateFilePath =<< MaybeT (return advClndr)
+        ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
+        MaybeT $ mapM (Txt.writeFile cachePath) $ Feed.getFeedLastUpdate feed
+        return ret
 
 readCache :: FilePath -> IO (Maybe Text)
 readCache f =
@@ -160,20 +169,16 @@ instance Mstch.ToMustache CalendarEntry where
         "entrySummary" ~> _entrySummary
       ]
 
-pickupNewEntryAfter :: Maybe UTCTime -> AdventCalendar -> AdventCalendar
+pickupNewEntryAfter :: UTCTime -> AdventCalendar -> AdventCalendar
 pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
   ac {_calendarEntries = filter isNewEntry _calendarEntries}
   where
     isNewEntry :: CalendarEntry -> Bool
-    isNewEntry CalendarEntry {_entryPublished} =
-      case mt of
-        Nothing -> True
-        Just t -> _entryPublished > t
+    isNewEntry CalendarEntry {_entryPublished} = _entryPublished > mt
 
-renderFeed :: Maybe UTCTime -> Feed -> FilePath -> MaybeT IO Text
-renderFeed mTime feed templatePath = do
+render :: FilePath -> AdventCalendar -> MaybeT IO Text
+render templatePath viewModel = do
   template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile templatePath
-  viewModel <- MaybeT $ return (pickupNewEntryAfter mTime <$> fromFeed feed)
   return (Mstch.substitute template viewModel)
 
 fromFeed :: Feed -> Maybe AdventCalendar
