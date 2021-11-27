@@ -26,6 +26,7 @@ dependencies:
 - feed
 - lens
 - mtl
+- modern-uri
 - text
 - time
 - xml-conduit
