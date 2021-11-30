@@ -28,10 +28,11 @@ import Data.Text (Text)
 import qualified Data.Text as Txt (pack, unpack)
 import qualified Data.Text.IO as Txt (putStr, writeFile)
 import Data.Time
-  ( ParseTime,
-    UTCTime,
+  ( LocalTime (localDay),
+    ParseTime,
     defaultTimeLocale,
     parseTimeM,
+    toGregorian,
   )
 import GHC.Generics (Generic)
 import qualified Network.Wreq as Wreq
@@ -131,14 +132,14 @@ main = do
             liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
             return ret
 
-readCache :: FilePath -> IO (Map String UTCTime)
+readCache :: FilePath -> IO (Map String LocalTime)
 readCache f =
   (read <$> readFile f) `catch` \e -> do
     if isDoesNotExistError e
       then return mempty
       else throwIO e
 
-updateCache :: String -> Text -> Map String UTCTime -> FilePath -> IO ()
+updateCache :: String -> Text -> Map String LocalTime -> FilePath -> IO ()
 updateCache url updated cache path =
   let newCache = Map.alter (const (parseFeedDate updated)) url cache
    in Txt.writeFile path (Txt.pack $ show newCache)
@@ -178,7 +179,7 @@ data CalendarEntry = CalendarEntry
     _entryAuthor :: Text,
     _entryUrl :: Text,
     _entrySummary :: Maybe Text,
-    _entryPublished :: UTCTime
+    _entryPublished :: LocalTime
   }
   deriving (Show)
 
@@ -188,10 +189,22 @@ instance Mstch.ToMustache CalendarEntry where
       [ "entryTitle" ~> _entryTitle,
         "entryAuthor" ~> _entryAuthor,
         "entryUrl" ~> _entryUrl,
-        "entrySummary" ~> _entrySummary
+        "entrySummary" ~> _entrySummary,
+        "entryPublished" ~> Gregorian (toGregorian $ localDay _entryPublished)
       ]
 
-pickupNewEntryAfter :: UTCTime -> AdventCalendar -> AdventCalendar
+newtype Gregorian = Gregorian (Integer, Int, Int)
+  deriving (Show)
+
+instance Mstch.ToMustache Gregorian where
+  toMustache (Gregorian (y, m ,d)) =
+    Mstch.object
+      [ "year" ~> y,
+        "month" ~> m,
+        "day" ~> d
+      ]
+
+pickupNewEntryAfter :: LocalTime -> AdventCalendar -> AdventCalendar
 pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
   ac {_calendarEntries = filter isNewEntry _calendarEntries}
   where
