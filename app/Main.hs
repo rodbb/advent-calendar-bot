@@ -49,6 +49,7 @@ import Options.Applicative
     showDefault,
     strArgument,
     strOption,
+    switch,
     value,
     (<**>),
   )
@@ -65,7 +66,8 @@ data Args = Args
   { mttrWebhookUrl :: String,
     feedUri :: String,
     templateFilePath :: FilePath,
-    cachePath :: FilePath
+    cachePath :: FilePath,
+    dryRun :: Bool
   }
 
 cliArgs :: ParserInfo Args
@@ -99,6 +101,11 @@ cliArgs =
               <> showDefault
               <> help "Feed Updated Date Cache File Path"
           )
+        <*> switch
+          ( long "dry-run"
+              <> showDefault
+              <> help "If true, will not post to Mattermost"
+          )
 
 main :: IO ()
 main = do
@@ -117,9 +124,12 @@ main = do
             Nothing -> fromFeed feed
             Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
         msg <- render templateFilePath advClndr
-        ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
-        liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
-        return ret
+        if dryRun
+          then "" <$ liftIO (Txt.putStr msg)
+          else do
+            ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
+            liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
+            return ret
 
 readCache :: FilePath -> IO (Map String UTCTime)
 readCache f =

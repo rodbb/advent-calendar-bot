@@ -8,7 +8,7 @@ Qiita アドベントカレンダーの更新を Mattermost に投稿するボ�
 Command to post Qiita Advent Calendar updates to Mattermost
 
 Usage: advent-calendar-bot-exe.EXE WEBHOOK_URL FEED_URL [--template FILE]
-                                   [--cache FILE]
+                                   [--cache FILE] [--dry-run]
 
 Available options:
   WEBHOOK_URL              Target Mattermost Incoming Webhook URL
@@ -17,6 +17,7 @@ Available options:
                            (default: "templates/default.mustache.md")
   --cache FILE             Feed Updated Date Cache File Path
                            (default: ".advent-calendar-bot")
+  --dry-run                If true, will not post to Mattermost
   -h,--help                Show this help text
 ```
 
