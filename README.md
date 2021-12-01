@@ -5,14 +5,15 @@ Qiita アドベントカレンダーの更新を Mattermost に投稿するボ�
 
 ```
 > stack run -- --help
-Command to post Qiita Advent Calendar updates to Mattermost
-
-Usage: advent-calendar-bot-exe.EXE WEBHOOK_URL FEED_URL [--template FILE]
+Usage: advent-calendar-bot-exe.EXE WEBHOOK_URL FEED_URL [--summary-api URL]
+                                   [--summary-api-key STRING] [--template FILE]
                                    [--cache FILE] [--dry-run]
 
 Available options:
   WEBHOOK_URL              Target Mattermost Incoming Webhook URL
   FEED_URL                 Target Qiita Advent Calendar Feed URL
+  --summary-api URL        Generate Summary API URL
+  --summary-api-key STRING Generate Summary API Key String
   --template FILE          Message Template File Path
                            (default: "templates/default.mustache.md")
   --cache FILE             Feed Updated Date Cache File Path

@@ -6,21 +6,24 @@
 
 module Main where
 
-import Control.Applicative (Alternative, (<|>))
+import Control.Applicative (Alternative, optional, (<|>))
 import Control.Exception (catch, throwIO)
-import Control.Lens ((^.), (^?))
+import Control.Lens ((&), (.~), (^.), (^?))
 import Control.Monad.Except (ExceptT (ExceptT))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT), exceptToMaybeT)
 import Data.Aeson
-  ( ToJSON,
+  ( FromJSON,
+    ToJSON,
     defaultOptions,
     genericToEncoding,
     toEncoding,
     toJSON,
   )
+import qualified Data.ByteString.Char8 as B (pack)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL (putStr)
+import Data.Foldable (Foldable (fold))
 import Data.List (find, uncons)
 import Data.Map.Strict (Map, (!?))
 import qualified Data.Map.Strict as Map
@@ -66,6 +69,8 @@ import qualified Text.URI as URI (relativeTo, render)
 data Args = Args
   { mttrWebhookUrl :: String,
     feedUri :: String,
+    summaryApiUrl :: Maybe String,
+    summaryApiKey :: Maybe String,
     templateFilePath :: FilePath,
     cachePath :: FilePath,
     dryRun :: Bool
@@ -87,6 +92,20 @@ cliArgs =
         <*> strArgument
           ( metavar "FEED_URL"
               <> help "Target Qiita Advent Calendar Feed URL"
+          )
+        <*> optional
+          ( strOption
+              ( long "summary-api"
+                  <> metavar "URL"
+                  <> help "Generate Summary API URL"
+              )
+          )
+        <*> optional
+          ( strOption
+              ( long "summary-api-key"
+                  <> metavar "STRING"
+                  <> help "Generate Summary API Key String"
+              )
           )
         <*> strOption
           ( long "template"
@@ -124,7 +143,10 @@ main = do
           case cached !? feedUri of
             Nothing -> fromFeed feed
             Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
-        msg <- render templateFilePath advClndr
+        advClndr' <- case summaryApiUrl of
+          Just url -> summarizeEntryContent url summaryApiKey advClndr
+          Nothing -> return advClndr
+        msg <- render templateFilePath advClndr'
         if dryRun
           then "" <$ liftIO (Txt.putStr msg)
           else do
@@ -179,6 +201,7 @@ data CalendarEntry = CalendarEntry
     _entryAuthor :: Text,
     _entryUrl :: Text,
     _entrySummary :: Maybe Text,
+    _entryContent :: Maybe Text,
     _entryPublished :: LocalTime
   }
   deriving (Show)
@@ -197,7 +220,7 @@ newtype Gregorian = Gregorian (Integer, Int, Int)
   deriving (Show)
 
 instance Mstch.ToMustache Gregorian where
-  toMustache (Gregorian (y, m ,d)) =
+  toMustache (Gregorian (y, m, d)) =
     Mstch.object
       [ "year" ~> y,
         "month" ~> m,
@@ -215,6 +238,35 @@ render :: FilePath -> AdventCalendar -> MaybeT IO Text
 render templatePath viewModel = do
   template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile templatePath
   return (Mstch.substitute template viewModel)
+
+summarizeEntryContent :: String -> Maybe String -> AdventCalendar -> MaybeT IO AdventCalendar
+summarizeEntryContent url mApiKey ac@AdventCalendar {_calendarEntries} = do
+  entries <- traverse getSummary _calendarEntries
+  return ac {_calendarEntries = entries}
+  where
+    getSummary :: CalendarEntry -> MaybeT IO CalendarEntry
+    getSummary en@CalendarEntry {_entrySummary, _entryContent} = do
+      reqBody <- MaybeT . return $ (`ApiRequestBody` 1000) <$> _entryContent
+      let opts = case mApiKey of
+            Just apiKey -> Wreq.defaults & Wreq.header "x-api-key" .~ [B.pack apiKey]
+            Nothing -> Wreq.defaults
+      res <- liftIO $ Wreq.asJSON =<< Wreq.postWith opts url (toJSON reqBody)
+      let mRet = res ^? Wreq.responseBody
+      return en {_entrySummary = fold . result <$> mRet}
+
+data ApiRequestBody = ApiRequestBody
+  { text :: Text,
+    length :: Int
+  }
+  deriving (Generic)
+
+instance ToJSON ApiRequestBody where
+  toEncoding = genericToEncoding defaultOptions
+
+newtype ApiResponseBody = ApiResponseBody {result :: [Text]}
+  deriving (Generic)
+
+instance FromJSON ApiResponseBody
 
 fromFeed :: Feed -> Maybe AdventCalendar
 fromFeed feed = case feed of
@@ -251,10 +303,16 @@ fromFeed feed = case feed of
           { _entryTitle = getContentAsText (Atom.entryTitle e),
             _entryAuthor,
             _entryUrl,
-            _entrySummary = Nothing,
+            _entrySummary = getContentAsText <$> Atom.entrySummary e,
+            _entryContent = getEntryContentAsText =<< Atom.entryContent e,
             _entryPublished
           }
-
+      where
+        getEntryContentAsText :: Atom.EntryContent -> Maybe Text
+        getEntryContentAsText ec = case ec of
+          Atom.TextContent txt -> Just txt
+          Atom.HTMLContent txt -> Just txt
+          _ -> Nothing -- 面倒なのでなかったことにする
     entryUrl :: Atom.Entry -> Maybe Text
     entryUrl e = Atom.linkHref <$> findAlternate (Atom.entryLinks e)
       where

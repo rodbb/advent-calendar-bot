@@ -4,7 +4,7 @@
 * [{{entryTitle}}]({{entryUrl}})
   - {{entryAuthor}}
   {{#entryPublished}}
-  - {{month}} 月 {{day}} 日
+  - {{month}} / {{day}}
   {{/entryPublished}}
   {{#entrySummary}}
   - {{.}}
