@@ -57,6 +57,7 @@ import Options.Applicative
     value,
     (<**>),
   )
+import qualified Paths_advent_calendar_bot as Paths (getDataDir)
 import System.IO.Error (isDoesNotExistError)
 import qualified Text.Atom.Feed as Atom
 import qualified Text.Feed.Import as Import (parseFeedSource)
@@ -236,7 +237,8 @@ pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
 
 render :: FilePath -> AdventCalendar -> MaybeT IO Text
 render templatePath viewModel = do
-  template <- exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile templatePath
+  dataDir <- liftIO Paths.getDataDir
+  template <- exceptToMaybeT $ ExceptT $ Mstch.automaticCompile [".", dataDir] templatePath
   return (Mstch.substitute template viewModel)
 
 summarizeEntryContent :: String -> Maybe String -> AdventCalendar -> MaybeT IO AdventCalendar
