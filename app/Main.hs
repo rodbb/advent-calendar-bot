@@ -173,12 +173,7 @@ getCalendarFeed feedUri = do
   return $ Import.parseFeedSource (res ^. Wreq.responseBody)
 
 parseFeedDate :: (MonadFail m, Alternative m, ParseTime t) => Text -> m t
-parseFeedDate txt =
-  let str = Txt.unpack txt
-   in parseAs "%FT%T%Ez" str -- format until 2020
-        <|> parseAs "%FT%T%Z" str -- format from 2021
-  where
-    parseAs = parseTimeM True defaultTimeLocale
+parseFeedDate = parseTimeM True defaultTimeLocale "%FT%T%EZ" . Txt.unpack
 
 data AdventCalendar = AdventCalendar
   { _calendarTitle :: Text,
