@@ -242,14 +242,21 @@ summarizeEntryContent url mApiKey ac@AdventCalendar {_calendarEntries} = do
   return ac {_calendarEntries = entries}
   where
     getSummary :: CalendarEntry -> MaybeT IO CalendarEntry
-    getSummary en@CalendarEntry {_entrySummary, _entryContent} = do
-      reqBody <- MaybeT . return $ (`ApiRequestBody` 1000) <$> _entryContent
+    getSummary en@CalendarEntry {_entrySummary, _entryContent} =
+      case _entrySummary of
+        Just _ -> return en
+        Nothing -> liftIO $ do
+          s <- runMaybeT (callSummarizeApi _entryContent)
+          return en {_entrySummary = s}
+    callSummarizeApi :: Maybe Text -> MaybeT IO Text
+    callSummarizeApi ec = do
+      reqBody <- MaybeT . return $ (`ApiRequestBody` 1000) <$> ec
       let opts = case mApiKey of
             Just apiKey -> Wreq.defaults & Wreq.header "x-api-key" .~ [B.pack apiKey]
             Nothing -> Wreq.defaults
       res <- liftIO $ Wreq.asJSON =<< Wreq.postWith opts url (toJSON reqBody)
       let mRet = res ^? Wreq.responseBody
-      return en {_entrySummary = fold . result <$> mRet}
+      MaybeT . return $ fold . result <$> mRet
 
 data ApiRequestBody = ApiRequestBody
   { text :: Text,
@@ -300,14 +307,22 @@ fromFeed feed = case feed of
           { _entryTitle = getContentAsText (Atom.entryTitle e),
             _entryAuthor,
             _entryUrl,
-            _entrySummary = getContentAsText <$> Atom.entrySummary e,
+            _entrySummary = entrySummary,
             _entryContent = getEntryContentAsText =<< Atom.entryContent e,
             _entryPublished
           }
       where
+        entrySummary :: Maybe Text
+        entrySummary =
+          let rawSummary = Atom.entrySummary e
+              rawContent = Atom.entryContent e
+          in (getContentAsText <$> rawSummary) <|> (contentAsSummary =<< rawContent)
+        contentAsSummary :: Atom.EntryContent -> Maybe Text
+        contentAsSummary ec = case ec of
+          Atom.TextContent txt -> Just txt -- 外部記事のとき
+          _ -> Nothing
         getEntryContentAsText :: Atom.EntryContent -> Maybe Text
         getEntryContentAsText ec = case ec of
-          Atom.TextContent txt -> Just txt
           Atom.HTMLContent txt -> Just txt
           _ -> Nothing -- 面倒なのでなかったことにする
     entryUrl :: Atom.Entry -> Maybe Text
