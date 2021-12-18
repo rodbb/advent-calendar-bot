@@ -24,7 +24,7 @@ jobs:
         stack-version: 'latest'
     - name: Set STACK_ROOR env on Linux
       if: matrix.os == 'ubuntu-latest'
-      run: echo "STACK_ROOR=$(stack path --stack-root)" >> $GITHUB_ENV
+      run: echo "STACK_ROOR=$(stack --system-ghc path --stack-root)" >> $GITHUB_ENV
     - name: Cache .stack
       id: cache-stack
       uses: actions/cache@v2
