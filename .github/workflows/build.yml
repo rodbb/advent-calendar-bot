@@ -28,6 +28,6 @@ jobs:
         enable-stack: true
         stack-version: 'latest'
     - name: Install dependencies
-      run: tack --system-ghc test --only-dependencies
+      run: stack --system-ghc test --only-dependencies
     - name: Build and Test
       run: stack --system-ghc test --copy-bins --local-bin-path=./bin
