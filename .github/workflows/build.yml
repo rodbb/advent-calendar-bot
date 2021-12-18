@@ -36,17 +36,26 @@ jobs:
     - name: Install dependencies
       run: stack --system-ghc test --only-dependencies
     - name: Build and Test
-      run: stack --system-ghc test --copy-bins --local-bin-path=./advent-calendar-bot
+      run: stack --system-ghc test --copy-bins --local-bin-path=./${{ github.event.repository.name }}
 
-    - name: Compress
-      id: compress
+    - name: Artifact basename
+      id: artifact
       run: |
-        zipname=advent-calendar-bot-${{ runner.OS }}
-        zip -r ${zipname} advent-calendar-bot
-        echo ::set-output name=path::${zipname}.zip
+        echo ::set-output name=basename::${{ github.event.repository.basename }}-${{ runner.OS }}
+        echo ::set-output name=extension::${{ (matrix.os == 'windows-latest' && 'zip') || 'tar.gz' }}
+    - name: Compress on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: tar zcvf ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }} ${{ github.event.repository.name }}
+    - name: Compress on Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive `
+        -Path ${{ github.event.repository.name }} `
+        -DestinationPath ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }}
+      shell: powershell
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         draft: true
         generate_release_notes: true
-        files: ${{ steps.compress.outputs.path }}
+        files: ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }}
