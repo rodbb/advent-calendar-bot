@@ -154,7 +154,7 @@ main = do
               Nothing -> return advClndr
             msg <- render templateFilePath advClndr'
             if dryRun
-              then "" <$ liftIO (Txt.putStr msg)
+              then liftIO ("" <$ Txt.putStr msg)
               else do
                 ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
                 liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
