@@ -47,17 +47,17 @@ jobs:
         echo ::set-output name=extension::${{ (matrix.os == 'windows-latest' && 'zip') || 'tar.gz' }}
     - name: Compress on Linux
       if: matrix.os == 'ubuntu-latest'
-      run: tar zcvf ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }} ${{ github.event.repository.name }}
+      run: tar zcvf ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }} ${{ github.event.repository.name }}
     - name: Compress on Windows
       if: matrix.os == 'windows-latest'
       run: |
         Compress-Archive `
         -Path ${{ github.event.repository.name }} `
-        -DestinationPath ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }}
+        -DestinationPath ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }}
       shell: powershell
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
         draft: true
         generate_release_notes: true
-        files: ${{ steps.artifact.output.basename }}.${{ steps.artifact.output.extension }}
+        files: ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }}
