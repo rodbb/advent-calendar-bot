@@ -16,11 +16,14 @@ jobs:
         shell: ${{ (matrix.os == 'windows-latest' && 'bash') || 'sh' }}
     steps:
     - uses: actions/checkout@v2
+    - name: Stack Root
+      id: stack-root
+      run: echo ::set-output name=path::$(stack path --stack-root)
     - name: Cache .stack
       id: cache-stack
       uses: actions/cache@v2
       with:
-        path: ~/.stack
+        path: ${{ steps.stack-root.outputs.path }}
         key: ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-${{ hashFiles('**/package.yaml') }}
         restore-keys: |
           ${{ runner.os }}-stack-
