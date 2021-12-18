@@ -11,6 +11,9 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: ${{ (matrix.os == 'windows-latest' && 'bash') || 'sh' }}
     steps:
     - uses: actions/checkout@v2
     - name: Cache .stack
