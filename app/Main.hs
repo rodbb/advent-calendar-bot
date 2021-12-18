@@ -144,16 +144,21 @@ main = do
           case cached !? feedUri of
             Nothing -> fromFeed feed
             Just updTime -> pickupNewEntryAfter updTime <$> fromFeed feed
-        advClndr' <- case summaryApiUrl of
-          Just url -> summarizeEntryContent url summaryApiKey advClndr
-          Nothing -> return advClndr
-        msg <- render templateFilePath advClndr'
-        if dryRun
-          then "" <$ liftIO (Txt.putStr msg)
-          else do
-            ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
+        if nullEntity advClndr
+          then do
             liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
-            return ret
+            return "There are no new articles."
+          else do
+            advClndr' <- case summaryApiUrl of
+              Just url -> summarizeEntryContent url summaryApiKey advClndr
+              Nothing -> return advClndr
+            msg <- render templateFilePath advClndr'
+            if dryRun
+              then "" <$ liftIO (Txt.putStr msg)
+              else do
+                ret <- MaybeT (postToMattermost mttrWebhookUrl msg)
+                liftIO $ updateCache feedUri (_calendarUpdate advClndr) cached cachePath
+                return ret
 
 readCache :: FilePath -> IO (Map String LocalTime)
 readCache f =
@@ -229,6 +234,9 @@ pickupNewEntryAfter mt ac@AdventCalendar {_calendarEntries} =
   where
     isNewEntry :: CalendarEntry -> Bool
     isNewEntry CalendarEntry {_entryPublished} = _entryPublished > mt
+
+nullEntity :: AdventCalendar -> Bool
+nullEntity AdventCalendar {_calendarEntries} = null _calendarEntries
 
 render :: FilePath -> AdventCalendar -> MaybeT IO Text
 render templatePath viewModel = do
