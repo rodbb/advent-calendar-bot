@@ -22,6 +22,9 @@ jobs:
         ghc-version: '8.10.7'
         enable-stack: true
         stack-version: 'latest'
+    - name: Set STACK_ROOR env on Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: echo "STACK_ROOR=$(stack path --stack-root)" >> $GITHUB_ENV
     - name: Cache .stack
       id: cache-stack
       uses: actions/cache@v2
@@ -31,6 +34,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-
           ${{ runner.os }}-stack-
+
     - name: Install dependencies
       run: stack --system-ghc test --only-dependencies
     - name: Build and Test
