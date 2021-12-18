@@ -43,7 +43,7 @@ jobs:
     - name: Artifact basename
       id: artifact
       run: |
-        echo ::set-output name=basename::${{ github.event.repository.basename }}-${{ runner.OS }}
+        echo ::set-output name=basename::${{ github.event.repository.name }}-${{ runner.OS }}
         echo ::set-output name=extension::${{ (matrix.os == 'windows-latest' && 'zip') || 'tar.gz' }}
     - name: Compress on Linux
       if: matrix.os == 'ubuntu-latest'
