@@ -22,16 +22,14 @@ jobs:
         ghc-version: '8.10.7'
         enable-stack: true
         stack-version: 'latest'
-    - name: Stack Root
-      id: stack-root
-      run: echo ::set-output name=path::$(stack --system-ghc path --stack-root)
     - name: Cache .stack
       id: cache-stack
       uses: actions/cache@v2
       with:
-        path: ${{ steps.stack-root.outputs.path }}
+        path: ${{ env.STACK_ROOT }}
         key: ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-${{ hashFiles('**/package.yaml') }}
         restore-keys: |
+          ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-
           ${{ runner.os }}-stack-
     - name: Install dependencies
       run: stack --system-ghc test --only-dependencies
