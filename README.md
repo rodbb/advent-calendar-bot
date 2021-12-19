@@ -1,11 +1,18 @@
 # advent-calendar-bot
 Qiita アドベントカレンダーの更新を Mattermost に投稿するボット
 
+## Installation
+
+1. [リリースページ](https://github.com/rodbb/advent-calendar-bot/releases) から使用するプラットフォームのファイルをダウンロードする
+2. 解凍する
+
 ## Usage
 
 ```
-> stack run -- --help
-Usage: advent-calendar-bot-exe.EXE WEBHOOK_URL FEED_URL [--summary-api URL]
+> advent-calendar-bot-exe.exe --help
+Command to post Qiita Advent Calendar updates to Mattermost
+
+Usage: advent-calendar-bot-exe.exe WEBHOOK_URL FEED_URL [--summary-api URL]
                                    [--summary-api-key STRING] [--template FILE]
                                    [--cache FILE] [--dry-run]
 
