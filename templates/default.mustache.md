@@ -7,7 +7,7 @@
   - {{month}} / {{day}}
   {{/entryPublished}}
   {{#entrySummary}}
-  - {{.}}
+  > {{.}}
   {{/entrySummary}}
 {{/calendarEntries}}
 {{^calendarEntries}}
