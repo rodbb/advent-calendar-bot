@@ -20,7 +20,7 @@ import Control.Monad.Reader (ask)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.Map.Strict ((!?))
-import qualified Data.Text.IO as Txt (putStr)
+import qualified Data.Text.IO as Txt (putStrLn)
 import Options.Applicative
   ( Parser,
     ParserInfo,
@@ -39,6 +39,7 @@ import Options.Applicative
     value,
     (<**>),
   )
+import qualified System.Exit as System (exitFailure, exitSuccess)
 
 cliArgs :: ParserInfo Args
 cliArgs =
@@ -93,9 +94,13 @@ main :: IO ()
 main = do
   ret <- runAppM app =<< execParser cliArgs
   case ret of
-    Nothing -> Txt.putStr "Something Wrong!"
-    Just x0 -> BL.putStr x0
-  putStrLn ""
+    Nothing -> do
+      Txt.putStrLn "Something Wrong!"
+      System.exitFailure
+    Just x0 -> do
+      BL.putStr x0
+      putStrLn ""
+      System.exitSuccess
   where
     app :: AppM ByteString
     app = do
@@ -116,7 +121,7 @@ main = do
             Nothing -> return advClndr
           msg <- render templateFilePath advClndr'
           if dryRun
-            then liftIO ("" <$ Txt.putStr msg)
+            then liftIO ("" <$ Txt.putStrLn msg)
             else do
               ret <- postMsg msg
               writeCache newCache
