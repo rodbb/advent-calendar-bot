@@ -40,7 +40,7 @@ jobs:
     - name: Build and Test
       run: stack --system-ghc test --copy-bins --local-bin-path=./${{ github.event.repository.name }}
     - name: Copy sample template
-      run: cp ./templates ./${{ github.event.repository.name }}/
+      run: cp -r ./templates ./${{ github.event.repository.name }}/
 
     - name: Artifact basename
       id: artifact
