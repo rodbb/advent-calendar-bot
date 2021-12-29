@@ -74,8 +74,6 @@ cliArgs =
         <*> strOption
           ( long "template"
               <> metavar "FILE"
-              <> value "templates/default.mustache.md"
-              <> showDefault
               <> help "Message Template File Path"
           )
         <*> strOption
