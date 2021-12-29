@@ -4,7 +4,7 @@
 
 module Main where
 
-import Bot.AppM
+import Bot.AppM (AppM, hoistMaybe, runAppM)
 import Bot.Capability.Cache (readCache, writeCache)
 import Bot.Capability.FetchFeed (fetchFeed)
 import Bot.Capability.PostMsg (postMsg)
