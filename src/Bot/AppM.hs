@@ -22,7 +22,6 @@ import Data.ByteString (ByteString)
 import Data.Text (Text)
 import qualified Data.Text as Txt
 import qualified Data.Text.IO as Txt (writeFile)
-import qualified Paths_advent_calendar_bot as Paths
 import System.IO.Error (isDoesNotExistError)
 import qualified Text.Mustache as Mstch
 
@@ -71,8 +70,7 @@ instance Summarize AppM where
 
 instance RenderMsg AppM where
   render templatePath viewModel = AppM $ do
-    dataDir <- liftIO Paths.getDataDir
-    template <- lift . exceptToMaybeT $ ExceptT $ Mstch.automaticCompile [".", dataDir] templatePath
+    template <- lift . exceptToMaybeT $ ExceptT $ Mstch.localAutomaticCompile templatePath
     return (Mstch.substitute template viewModel)
 
 instance PostMsg AppM where
