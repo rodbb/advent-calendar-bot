@@ -21,6 +21,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.Map.Strict ((!?))
 import qualified Data.Text.IO as Txt (putStrLn)
+import qualified Data.Version as Ver (showVersion)
 import Options.Applicative
   ( Parser,
     ParserInfo,
@@ -29,9 +30,12 @@ import Options.Applicative
     header,
     help,
     helper,
+    hidden,
     info,
+    infoOption,
     long,
     metavar,
+    short,
     showDefault,
     strArgument,
     strOption,
@@ -39,14 +43,24 @@ import Options.Applicative
     value,
     (<**>),
   )
+import qualified Paths_advent_calendar_bot as Paths
 import qualified System.Exit as System (exitFailure, exitSuccess)
 
 cliArgs :: ParserInfo Args
 cliArgs =
-  info (opts <**> helper) $
+  info (opts <**> showVersion <**> helper) $
     fullDesc
       <> header "Command to post Qiita Advent Calendar updates to Mattermost"
   where
+    showVersion :: Parser (a -> a)
+    showVersion =
+      infoOption
+        (Ver.showVersion Paths.version)
+        ( long "version"
+            <> short 'v'
+            <> help "Show version"
+            <> hidden
+        )
     opts :: Parser Args
     opts =
       Args
