@@ -3,7 +3,9 @@
 
 module Bot.Api.Asahi where
 
-import Control.Lens ((&), (.~), (^?), (^.))
+import Bot.Api.Util (ReqInfo, reqPost, useStr)
+import qualified Bot.Util as Util
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.Aeson
   ( FromJSON,
     ToJSON (toEncoding, toJSON),
@@ -14,15 +16,20 @@ import qualified Data.ByteString.Char8 as B
 import Data.Foldable (fold)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import qualified Network.Wreq as Wreq
+import qualified Network.HTTP.Req as Req
 import Prelude hiding (length)
 
-callSummarizeApi :: String -> String -> Text -> IO Text
+callSummarizeApi :: String -> String -> Text -> MaybeT IO Text
 callSummarizeApi url apiKey ec = do
-  let reqBody = ApiRequestBody {text = ec, length = 1000}
-  let opts = Wreq.defaults & Wreq.header "x-api-key" .~ [B.pack apiKey]
-  res <- Wreq.asJSON =<< Wreq.postWith opts url (toJSON reqBody)
-  return $ (fold . result) (res ^. Wreq.responseBody)
+  eUrlInfo <- Util.hoistMaybe (useStr url)
+  either post post eUrlInfo
+  where
+    post :: ReqInfo scheme -> MaybeT IO Text
+    post (url, opt) = do
+      let body = Req.ReqBodyJson ApiRequestBody {text = ec, length = 1000}
+      let opts = opt <> Req.header "x-api-key" (B.pack apiKey)
+      let req = reqPost (url, opts) body Req.jsonResponse
+      fold . result . Req.responseBody <$> Req.runReq Req.defaultHttpConfig req
 
 data ApiRequestBody = ApiRequestBody
   { text :: Text,

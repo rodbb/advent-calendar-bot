@@ -12,6 +12,7 @@ import Bot.Capability.PostMsg (PostMsg (postMsg))
 import Bot.Capability.RenderMsg (RenderMsg (render))
 import Bot.Capability.Summarize (Summarize (summarize))
 import Bot.Data.Args (Args (..))
+import qualified Bot.Util as Util
 import Control.Exception (catch, throwIO)
 import Control.Monad.Except (ExceptT (ExceptT))
 import Control.Monad.Fail (MonadFail)
@@ -39,7 +40,7 @@ runAppM :: AppM out -> Args -> IO (Maybe out)
 runAppM AppM {unAppM} = runMaybeT . runReaderT unAppM
 
 hoistMaybe :: Maybe a -> AppM a
-hoistMaybe = AppM . lift . MaybeT . return
+hoistMaybe = AppM . lift . Util.hoistMaybe
 
 instance ManageCache AppM where
   readCache = do
@@ -62,11 +63,9 @@ instance Summarize AppM where
     mApiUrl <- asks summaryApiUrl
     mApiKey <- asks summaryApiKey
     lift $ do
-      apiUrl <- hoistM mApiUrl
-      apiKey <- hoistM mApiKey
-      liftIO $ callSummarizeApi apiUrl apiKey t
-    where
-      hoistM = MaybeT . return
+      apiUrl <- Util.hoistMaybe mApiUrl
+      apiKey <- Util.hoistMaybe mApiKey
+      callSummarizeApi apiUrl apiKey t
 
 instance RenderMsg AppM where
   render templatePath viewModel = AppM $ do
