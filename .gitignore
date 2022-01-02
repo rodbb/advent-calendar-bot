@@ -4,3 +4,4 @@
 templates/*
 !templates/default.mustache.md
 .advent-calendar-bot
+/advent-calendar-bot/
