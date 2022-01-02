@@ -42,6 +42,17 @@ jobs:
     - name: Copy sample template
       run: cp -r ./templates ./${{ github.event.repository.name }}/
 
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: '3.x'
+    - name: Collect dependencies License file
+      run: stack --system-ghc exec -- licensed cache
+
+    - name: Copy own license file
+      run: cp ./LICENSE ./${{ github.event.repository.name }}/
+    - name: Copy READEME
+      run: cp ./README.md ./${{ github.event.repository.name }}/
+
     - name: Artifact basename
       id: artifact
       run: |

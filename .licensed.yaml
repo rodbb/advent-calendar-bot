@@ -1,0 +1,30 @@
+# Path is relative to configuration root and specifies where cached metadata will be stored.
+# If not set, defaults to '.licenses'
+cache_path: 'advent-calendar-bot/licenses'
+
+# Sources of metadata
+sources:
+  cabal: true
+
+# Dependencies with these licenses are allowed and will not raise errors or warnings.
+# This list does not have a default value and is required for `licensed status`
+# to succeed.
+allowed:
+  - mit
+  - apache-2.0
+  - bsd-2-clause
+  - bsd-3-clause
+  - cc0-1.0
+  - isc
+
+# These dependencies are ignored during enumeration.
+# They will not be cached, and will not raise errors or warnings.
+# This configuration is intended to be used for dependencies that don't need to
+# be included for compliance purposes, such as other projects owned by the current
+# project's owner, internal dependencies, and dependencies that aren't shipped with
+# the project like test frameworks.
+ignored:
+  cabal:
+    - advent-calendar-bot
+    # base package dependency
+    - rts
