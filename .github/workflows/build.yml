@@ -51,7 +51,7 @@ jobs:
     - name: Copy own license file
       run: cp ./LICENSE ./${{ github.event.repository.name }}/
     - name: Copy READEME
-      run: cp ./READEME.md ./${{ github.event.repository.name }}/
+      run: cp ./README.md ./${{ github.event.repository.name }}/
 
     - name: Artifact basename
       id: artifact
