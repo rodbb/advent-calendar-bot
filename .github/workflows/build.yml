@@ -48,6 +48,11 @@ jobs:
     - name: Collect dependencies License file
       run: stack exec -- licensed cache
 
+    - name: Copy own license file
+      run: cp ./LICENSE ./${{ github.event.repository.name }}/
+    - name: Copy READEME
+      run: cp ./READEME.md ./${{ github.event.repository.name }}/
+
     - name: Artifact basename
       id: artifact
       run: |
