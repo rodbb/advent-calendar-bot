@@ -46,7 +46,7 @@ jobs:
       with:
         version: '3.x'
     - name: Collect dependencies License file
-      run: stack exec -- licensed cache
+      run: stack --system-ghc exec -- licensed cache
 
     - name: Copy own license file
       run: cp ./LICENSE ./${{ github.event.repository.name }}/
