@@ -108,10 +108,10 @@ main :: IO ()
 main = do
   ret <- runAppM app =<< execParser cliArgs
   case ret of
-    Nothing -> do
-      Txt.putStrLn "Something Wrong!"
+    Left err -> do
+      putStrLn err
       System.exitFailure
-    Just x0 -> do
+    Right x0 -> do
       BL.putStr x0
       putStrLn ""
       System.exitSuccess
@@ -121,9 +121,10 @@ main = do
       Args {feedUri, summaryApiUrl, templateFilePath, dryRun} <- ask
       cached <- readCache
       feed <- fetchFeed feedUri
-      advClndr <- hoistMaybe $ case cached !? feedUri of
-        Nothing -> fromFeed =<< feed
-        Just updTime -> pickupNewEntryAfter updTime <$> (fromFeed =<< feed)
+      let feedClndr = hoistMaybe "Invalid Feed" (fromFeed feed)
+      advClndr <- case cached !? feedUri of
+        Nothing -> feedClndr
+        Just updTime -> pickupNewEntryAfter updTime <$> feedClndr
       let newCache = updateCache feedUri (_calendarUpdate advClndr) cached
       if nullEntries advClndr
         then do
