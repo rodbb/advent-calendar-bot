@@ -21,6 +21,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.Map.Strict ((!?))
 import qualified Data.Text.IO as Txt (putStrLn)
+import qualified Data.Version as Ver (showVersion)
 import Options.Applicative
   ( Parser,
     ParserInfo,
@@ -29,9 +30,12 @@ import Options.Applicative
     header,
     help,
     helper,
+    hidden,
     info,
+    infoOption,
     long,
     metavar,
+    short,
     showDefault,
     strArgument,
     strOption,
@@ -39,14 +43,24 @@ import Options.Applicative
     value,
     (<**>),
   )
+import qualified Paths_advent_calendar_bot as Paths
 import qualified System.Exit as System (exitFailure, exitSuccess)
 
 cliArgs :: ParserInfo Args
 cliArgs =
-  info (opts <**> helper) $
+  info (opts <**> showVersion <**> helper) $
     fullDesc
       <> header "Command to post Qiita Advent Calendar updates to Mattermost"
   where
+    showVersion :: Parser (a -> a)
+    showVersion =
+      infoOption
+        (Ver.showVersion Paths.version)
+        ( long "version"
+            <> short 'v'
+            <> help "Show version"
+            <> hidden
+        )
     opts :: Parser Args
     opts =
       Args
@@ -94,10 +108,10 @@ main :: IO ()
 main = do
   ret <- runAppM app =<< execParser cliArgs
   case ret of
-    Nothing -> do
-      Txt.putStrLn "Something Wrong!"
+    Left err -> do
+      putStrLn err
       System.exitFailure
-    Just x0 -> do
+    Right x0 -> do
       BL.putStr x0
       putStrLn ""
       System.exitSuccess
@@ -107,9 +121,10 @@ main = do
       Args {feedUri, summaryApiUrl, templateFilePath, dryRun} <- ask
       cached <- readCache
       feed <- fetchFeed feedUri
-      advClndr <- hoistMaybe $ case cached !? feedUri of
-        Nothing -> fromFeed =<< feed
-        Just updTime -> pickupNewEntryAfter updTime <$> (fromFeed =<< feed)
+      let feedClndr = hoistMaybe "Invalid Feed" (fromFeed feed)
+      advClndr <- case cached !? feedUri of
+        Nothing -> feedClndr
+        Just updTime -> pickupNewEntryAfter updTime <$> feedClndr
       let newCache = updateCache feedUri (_calendarUpdate advClndr) cached
       if nullEntries advClndr
         then do

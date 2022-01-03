@@ -7,7 +7,6 @@ module Bot.Data.AdventCalendar where
 import Bot.Data.AtomFeed (getContentAsText)
 import Bot.Data.CalendarEntry (CalendarEntry (..), fromAtomEntry)
 import Control.Applicative (Alternative, (<|>))
-import Control.Lens ((&), (.~), (^?))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
 import Data.Aeson (FromJSON, ToJSON, defaultOptions, genericToEncoding, toJSON)

@@ -28,10 +28,10 @@ dependencies:
 - bytestring
 - containers
 - feed
-- lens
 - mtl
 - modern-uri
 - mustache
+- req
 - text
 - time
 - transformers
