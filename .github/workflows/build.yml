@@ -36,9 +36,9 @@ jobs:
           ${{ runner.os }}-stack-
 
     - name: Install dependencies
-      run: stack --system-ghc test --only-dependencies
+      run: stack --system-ghc build --only-dependencies
     - name: Build and Test
-      run: stack --system-ghc test --copy-bins --local-bin-path=./${{ github.event.repository.name }}
+      run: stack --system-ghc install --local-bin-path=./${{ github.event.repository.name }}
     - name: Copy sample template
       run: cp -r ./templates ./${{ github.event.repository.name }}/
 
