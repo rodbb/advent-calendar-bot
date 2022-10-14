@@ -13,23 +13,26 @@ import Bot.Capability.RenderMsg (RenderMsg (render))
 import Bot.Capability.Summarize (Summarize (summarize))
 import Bot.Data.Args (Args (..))
 import qualified Bot.Util as Util
+import Control.Applicative (Alternative)
 import Control.Exception (catch, throwIO)
 import Control.Monad.Except (ExceptT (ExceptT), runExceptT, withExceptT)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT (runReaderT), asks, guard)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Except (except)
-import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BL (toStrict)
 import Data.Text (Text)
 import qualified Data.Text as Txt
 import qualified Data.Text.IO as Txt (writeFile)
 import System.IO.Error (isDoesNotExistError)
 import qualified Text.Mustache as Mstch
+import Data.String.Conversions (convertString)
 
 newtype AppM out = AppM {unAppM :: ReaderT Args (ExceptT String IO) out}
   deriving
     ( Functor,
       Applicative,
+      Alternative,
       Monad,
       MonadReader Args,
       MonadFail,
@@ -76,4 +79,5 @@ instance RenderMsg AppM where
 instance PostMsg AppM where
   postMsg msg = AppM $ do
     hookUrl <- asks mttrWebhookUrl
-    lift $ ExceptT (Mttr.postMsg hookUrl msg)
+    ret <- lift $ ExceptT (Mttr.postMsg hookUrl msg)
+    return (convertString ret)

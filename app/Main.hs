@@ -14,13 +14,12 @@ import Bot.Data.AdventCalendar (AdventCalendar (..), forEntries, fromFeed, nullE
 import Bot.Data.Args (Args (..))
 import Bot.Data.Cache (updateCache)
 import Bot.Data.CalendarEntry (fillSummary)
-import Control.Applicative (optional)
-import Control.Monad.IO.Class (liftIO)
+import Control.Applicative (optional, (<|>))
 import Control.Monad.Reader (ask)
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BL (putStr)
 import Data.Map.Strict ((!?))
+import Data.Text (Text)
 import qualified Data.Text.IO as Txt (putStrLn)
+import Data.Time (LocalTime)
 import qualified Data.Version as Ver (showVersion)
 import Options.Applicative
   ( Parser,
@@ -45,6 +44,7 @@ import Options.Applicative
   )
 import qualified Paths_advent_calendar_bot as Paths
 import qualified System.Exit as System (exitFailure, exitSuccess)
+import Text.Feed.Types (Feed)
 
 cliArgs :: ParserInfo Args
 cliArgs =
@@ -112,32 +112,30 @@ main = do
       putStrLn err
       System.exitFailure
     Right x0 -> do
-      BL.putStr x0
-      putStrLn ""
+      Txt.putStrLn x0
       System.exitSuccess
   where
-    app :: AppM ByteString
+    app :: AppM Text
     app = do
-      Args {feedUri, summaryApiUrl, templateFilePath, dryRun} <- ask
+      Args {feedUri, templateFilePath, dryRun} <- ask
       cached <- readCache
       feed <- fetchFeed feedUri
-      let feedClndr = hoistMaybe "Invalid Feed" (fromFeed feed)
-      advClndr <- case cached !? feedUri of
-        Nothing -> feedClndr
-        Just updTime -> pickupNewEntryAfter updTime <$> feedClndr
-      let newCache = updateCache feedUri (_calendarUpdate advClndr) cached
-      if nullEntries advClndr
-        then do
-          writeCache newCache
-          return "There are no new articles."
+      advClndr <- mkAdventCalendor (cached !? feedUri) feed
+      msg <- render templateFilePath advClndr
+      if dryRun
+        then return $ unlessNullEntries advClndr msg
         else do
-          advClndr' <- case summaryApiUrl of
-            Just _ -> forEntries (fillSummary summarize) advClndr
-            Nothing -> return advClndr
-          msg <- render templateFilePath advClndr'
-          if dryRun
-            then liftIO ("" <$ Txt.putStrLn msg)
-            else do
-              ret <- postMsg msg
-              writeCache newCache
-              return ret
+          ret <- unlessNullEntries advClndr <$> postMsg msg
+          writeCache $ updateCache feedUri (_calendarUpdate advClndr) cached
+          return ret
+
+    mkAdventCalendor :: Maybe LocalTime -> Maybe Feed -> AppM AdventCalendar
+    mkAdventCalendor cached feed = do
+      advClndr <- hoistMaybe $ maybe id pickupNewEntryAfter cached <$> (fromFeed =<< feed)
+      forEntries (fillSummary summarize) advClndr <|> return advClndr
+
+    unlessNullEntries :: AdventCalendar -> Text -> Text
+    unlessNullEntries advClndr ret =
+      if nullEntries advClndr
+        then "There are no new articles."
+        else ret
