@@ -4,7 +4,7 @@
 
 module Main where
 
-import Bot.AppM (AppM, hoistMaybe, runAppM)
+import Bot.AppM (AppM, runAppM, (<?))
 import Bot.Capability.Cache (readCache, writeCache)
 import Bot.Capability.FetchFeed (fetchFeed)
 import Bot.Capability.PostMsg (postMsg)
@@ -108,12 +108,8 @@ main :: IO ()
 main = do
   ret <- runAppM app =<< execParser cliArgs
   case ret of
-    Left err -> do
-      putStrLn err
-      System.exitFailure
-    Right x0 -> do
-      Txt.putStrLn x0
-      System.exitSuccess
+    Left err -> Txt.putStrLn err >> System.exitFailure
+    Right out -> Txt.putStrLn out >> System.exitSuccess
   where
     app :: AppM Text
     app = do
@@ -129,9 +125,10 @@ main = do
           writeCache $ updateCache feedUri (_calendarUpdate advClndr) cached
           return ret
 
-    mkAdventCalendor :: Maybe LocalTime -> Maybe Feed -> AppM AdventCalendar
+    mkAdventCalendor :: Maybe LocalTime -> Feed -> AppM AdventCalendar
     mkAdventCalendor cached feed = do
-      advClndr <- hoistMaybe $ maybe id pickupNewEntryAfter cached <$> (fromFeed =<< feed)
+      mAdvClndr <- fromFeed feed <? ("failed to parse feed" :: Text)
+      let advClndr = maybe id pickupNewEntryAfter cached mAdvClndr
       forEntries (fillSummary summarize) advClndr <|> return advClndr
 
     unlessNullEntries :: AdventCalendar -> Text -> Text

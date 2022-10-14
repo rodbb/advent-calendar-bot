@@ -32,8 +32,10 @@ dependencies:
 - modern-uri
 - mustache
 - req
+- parsec
 - string-conversions
 - text
+- text-show
 - time
 - transformers
 - xml-conduit
