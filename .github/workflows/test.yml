@@ -11,7 +11,7 @@ jobs:
     - uses: haskell/actions/setup@main
       name: Setup Haskell
       with:
-        ghc-version: '8.10.7'
+        ghc-version: '9.0.2'
         enable-stack: true
         stack-version: 'latest'
     - name: Set STACK_ROOR env
