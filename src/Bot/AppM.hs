@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Bot.AppM (AppM, runAppM, (<?)) where
 
@@ -51,16 +50,8 @@ hoistIOEither = AppM . lift . withExceptT showt . ExceptT
 hoistEither :: TextShow e => Either e a -> AppM a
 hoistEither = hoistIOEither . return
 
-note :: e -> Maybe a -> Either e a
-note e m = case m of
-  Nothing -> Left e
-  Just a -> Right a
-
 (<?) :: TextShow e => Maybe a -> e -> AppM a
-m <? err = hoistEither (note err m)
-
-hoistMaybe :: String -> Maybe a -> AppM a
-hoistMaybe e = AppM . lift . Util.hoistMaybe e
+m <? err = hoistEither (Util.note err m)
 
 instance ManageCache AppM where
   readCache = do
@@ -84,7 +75,7 @@ instance Summarize AppM where
     mApiKey <- asks summaryApiKey
     apiUrl <- mApiUrl <? ("summaryApiUrl is required" :: Text)
     apiKey <- mApiKey <? ("summaryApiKey is required" :: Text)
-    liftIO $ callSummarizeApi apiUrl apiKey t
+    AppM . lift $ callSummarizeApi apiUrl apiKey t
 
 instance RenderMsg AppM where
   render templatePath viewModel = AppM $ do

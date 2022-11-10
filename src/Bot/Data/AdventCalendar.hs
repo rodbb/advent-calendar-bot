@@ -18,7 +18,6 @@ import Data.Text (Text)
 import qualified Data.Text as Txt
 import Data.Time (LocalTime, ParseTime, defaultTimeLocale, parseTimeM)
 import GHC.Generics (Generic)
-import qualified Network.Wreq as Wreq
 import qualified Text.Atom.Feed as Atom
 import Text.Feed.Types (Feed (AtomFeed))
 import Text.Mustache ((~>))

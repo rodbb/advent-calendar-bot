@@ -14,12 +14,12 @@ import qualified Network.HTTP.Req as Req
 
 type WebhookUrl = String
 
-postMsg :: WebhookUrl -> Text -> IO (Either String ByteString)
+postMsg :: WebhookUrl -> Text -> IO (Either Text ByteString)
 postMsg webhookUrl theMsg = runExceptT $ do
   eUrlInfo <- Util.hoistMaybe "Invalid API URL" (useStr webhookUrl)
   either post post eUrlInfo
   where
-    post :: ReqInfo scheme -> ExceptT String IO ByteString
+    post :: ReqInfo scheme -> ExceptT Text IO ByteString
     post info = do
       let body = Req.ReqBodyJson MttrmstMsg {text = theMsg}
       let req = reqPost info body Req.lbsResponse

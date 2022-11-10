@@ -19,12 +19,12 @@ import GHC.Generics (Generic)
 import qualified Network.HTTP.Req as Req
 import Prelude hiding (length)
 
-callSummarizeApi :: String -> String -> Text -> ExceptT String IO Text
+callSummarizeApi :: String -> String -> Text -> ExceptT Text IO Text
 callSummarizeApi url apiKey ec = do
   eUrlInfo <- Util.hoistMaybe "Invalid API URL" (useStr url)
   either post post eUrlInfo
   where
-    post :: ReqInfo scheme -> ExceptT String IO Text
+    post :: ReqInfo scheme -> ExceptT Text IO Text
     post (url, opt) = do
       let body = Req.ReqBodyJson ApiRequestBody {text = ec, length = 1000}
       let opts = opt <> Req.header "x-api-key" (B.pack apiKey)
