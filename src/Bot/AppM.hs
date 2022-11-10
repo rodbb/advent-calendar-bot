@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Bot.AppM where
+module Bot.AppM (AppM, runAppM, (<?)) where
 
 import Bot.Api.Asahi (callSummarizeApi)
 import qualified Bot.Api.Mattermost as Mttr (postMsg)
@@ -12,35 +12,46 @@ import Bot.Capability.PostMsg (PostMsg (postMsg))
 import Bot.Capability.RenderMsg (RenderMsg (render))
 import Bot.Capability.Summarize (Summarize (summarize))
 import Bot.Data.Args (Args (..))
+import qualified Bot.Util as Util
+import Control.Applicative (Alternative)
 import Control.Exception (catch, throwIO)
-import Control.Monad.Except (ExceptT (ExceptT))
+import Control.Monad.Except (ExceptT (ExceptT), runExceptT, withExceptT)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.Reader (MonadIO (liftIO), MonadReader, ReaderT (runReaderT), asks, guard)
 import Control.Monad.Trans (lift)
-import Control.Monad.Trans.Maybe (MaybeT (MaybeT, runMaybeT), exceptToMaybeT)
-import Data.ByteString (ByteString)
+import Control.Monad.Trans.Except (except)
+import qualified Data.ByteString.Lazy as BL (toStrict)
+import Data.String.Conversions (convertString)
 import Data.Text (Text)
 import qualified Data.Text as Txt
 import qualified Data.Text.IO as Txt (writeFile)
-import qualified Paths_advent_calendar_bot as Paths
 import System.IO.Error (isDoesNotExistError)
 import qualified Text.Mustache as Mstch
+import Text.Parsec.Error (ParseError, showErrorMessages)
+import TextShow (TextShow (showt))
 
-newtype AppM out = AppM {unAppM :: ReaderT Args (MaybeT IO) out}
+newtype AppM out = AppM {unAppM :: ReaderT Args (ExceptT Text IO) out}
   deriving
     ( Functor,
       Applicative,
+      Alternative,
       Monad,
       MonadReader Args,
       MonadFail,
       MonadIO
     )
 
-runAppM :: AppM out -> Args -> IO (Maybe out)
-runAppM AppM {unAppM} = runMaybeT . runReaderT unAppM
+runAppM :: AppM out -> Args -> IO (Either Text out)
+runAppM AppM {unAppM} = runExceptT . runReaderT unAppM
 
-hoistMaybe :: Maybe a -> AppM a
-hoistMaybe = AppM . lift . MaybeT . return
+hoistIOEither :: TextShow e => IO (Either e a) -> AppM a
+hoistIOEither = AppM . lift . withExceptT showt . ExceptT
+
+hoistEither :: TextShow e => Either e a -> AppM a
+hoistEither = hoistIOEither . return
+
+(<?) :: TextShow e => Maybe a -> e -> AppM a
+m <? err = hoistEither (Util.note err m)
 
 instance ManageCache AppM where
   readCache = do
@@ -56,26 +67,24 @@ instance ManageCache AppM where
     liftIO $ Txt.writeFile path $ Txt.pack (show cache)
 
 instance FetchFeed AppM where
-  fetchFeed = liftIO . Qiita.getCalendarFeed
+  fetchFeed = AppM . lift . ExceptT . Qiita.getCalendarFeed
 
 instance Summarize AppM where
-  summarize t = AppM $ do
+  summarize t = do
     mApiUrl <- asks summaryApiUrl
     mApiKey <- asks summaryApiKey
-    lift $ do
-      apiUrl <- hoistM mApiUrl
-      apiKey <- hoistM mApiKey
-      liftIO $ callSummarizeApi apiUrl apiKey t
-    where
-      hoistM = MaybeT . return
+    apiUrl <- mApiUrl <? ("summaryApiUrl is required" :: Text)
+    apiKey <- mApiKey <? ("summaryApiKey is required" :: Text)
+    AppM . lift $ callSummarizeApi apiUrl apiKey t
 
 instance RenderMsg AppM where
   render templatePath viewModel = AppM $ do
-    dataDir <- liftIO Paths.getDataDir
-    template <- lift . exceptToMaybeT $ ExceptT $ Mstch.automaticCompile [".", dataDir] templatePath
+    let compile = Mstch.localAutomaticCompile templatePath
+    template <- lift $ withExceptT (Txt.pack . show) $ ExceptT compile
     return (Mstch.substitute template viewModel)
 
 instance PostMsg AppM where
   postMsg msg = AppM $ do
     hookUrl <- asks mttrWebhookUrl
-    lift $ MaybeT (Mttr.postMsg hookUrl msg)
+    ret <- lift $ ExceptT (Mttr.postMsg hookUrl msg)
+    return (convertString ret)

@@ -7,7 +7,6 @@ module Bot.Data.AdventCalendar where
 import Bot.Data.AtomFeed (getContentAsText)
 import Bot.Data.CalendarEntry (CalendarEntry (..), fromAtomEntry)
 import Control.Applicative (Alternative, (<|>))
-import Control.Lens ((&), (.~), (^?))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
 import Data.Aeson (FromJSON, ToJSON, defaultOptions, genericToEncoding, toJSON)
@@ -19,7 +18,6 @@ import Data.Text (Text)
 import qualified Data.Text as Txt
 import Data.Time (LocalTime, ParseTime, defaultTimeLocale, parseTimeM)
 import GHC.Generics (Generic)
-import qualified Network.Wreq as Wreq
 import qualified Text.Atom.Feed as Atom
 import Text.Feed.Types (Feed (AtomFeed))
 import Text.Mustache ((~>))
