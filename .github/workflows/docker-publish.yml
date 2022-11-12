@@ -32,6 +32,7 @@ jobs:
         with:
           latest: true
           tarBall: true
+          fileName: advent-calendar-bot-Linux.tar.gz
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
