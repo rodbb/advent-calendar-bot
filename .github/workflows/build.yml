@@ -7,29 +7,32 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest]
+
     defaults:
       run:
         shell: ${{ (matrix.os == 'windows-latest' && 'bash') || 'sh' }}
+
     steps:
     - uses: actions/checkout@v2
-    - uses: haskell/actions/setup@main
-      name: Setup Haskell
+
+    - name: Setup Haskell
+      id: setup-haskell
+      uses: haskell/actions/setup@main
       with:
         ghc-version: '9.0.2'
         enable-stack: true
         stack-version: 'latest'
-    - name: Set STACK_ROOR env on Linux
-      if: matrix.os == 'ubuntu-latest'
-      run: echo "STACK_ROOT=$(stack --system-ghc path --stack-root)" >> $GITHUB_ENV
+
     - name: Cache .stack
       id: cache-stack
       uses: actions/cache@v2
       with:
-        path: ${{ env.STACK_ROOT }}
+        path: ${{ steps.setup-haskell.outputs.stack-root }}
         key: ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-${{ hashFiles('**/package.yaml') }}
         restore-keys: |
           ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-
@@ -37,30 +40,33 @@ jobs:
 
     - name: Install dependencies
       run: stack --system-ghc build --only-dependencies
-    - name: Build and Test
+
+    - name: Build Application
       run: stack --system-ghc install --local-bin-path=./${{ github.event.repository.name }}
+
     - name: Copy sample template
       run: cp -r ./templates ./${{ github.event.repository.name }}/
 
     - uses: jonabc/setup-licensed@v1
       with:
         version: '3.x'
+
     - name: Collect dependencies License file
       run: stack --system-ghc exec -- licensed cache
 
-    - name: Copy own license file
-      run: cp ./LICENSE ./${{ github.event.repository.name }}/
-    - name: Copy READEME
-      run: cp ./README.md ./${{ github.event.repository.name }}/
+    - name: Copy own license file and READEME
+      run: cp ./{LICENSE, README.md} ./${{ github.event.repository.name }}/
 
     - name: Artifact basename
       id: artifact
       run: |
         echo ::set-output name=basename::${{ github.event.repository.name }}-${{ runner.OS }}
         echo ::set-output name=extension::${{ (matrix.os == 'windows-latest' && 'zip') || 'tar.gz' }}
+
     - name: Compress on Linux
       if: matrix.os == 'ubuntu-latest'
       run: tar zcvf ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }} ${{ github.event.repository.name }}
+
     - name: Compress on Windows
       if: matrix.os == 'windows-latest'
       run: |
@@ -68,6 +74,7 @@ jobs:
         -Path ${{ github.event.repository.name }} `
         -DestinationPath ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }}
       shell: powershell
+
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
