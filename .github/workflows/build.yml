@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        shell: ${{ (runner.os == 'Windows' && 'bash') || 'sh' }}
+        shell: ${{ (matrix.os == 'Windows' && 'bash') || 'sh' }}
 
     steps:
     - uses: actions/checkout@v3
