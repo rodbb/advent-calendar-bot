@@ -32,7 +32,7 @@ jobs:
       id: cache-stack
       uses: actions/cache@v2
       with:
-        path: ${{ step.setup-haskell.outputs.stack-root }}
+        path: ${{ steps.setup-haskell.outputs.stack-root }}
         key: ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-${{ hashFiles('**/package.yaml') }}
         restore-keys: |
           ${{ runner.os }}-stack-${{ hashFiles('**/stack.yaml.lock') }}-
