@@ -1,7 +1,8 @@
 name: Test Application
 
 on:
-  push: [branches]
+  push:
+    branches: ['**']
 
 jobs:
   build:
