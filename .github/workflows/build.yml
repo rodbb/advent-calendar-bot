@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        shell: ${{ (matrix.os == 'windows-latest' && 'bash') || 'sh' }}
+        shell: ${{ (runner.os == 'Windows' && 'bash') || 'sh' }}
 
     steps:
     - uses: actions/checkout@v3
@@ -61,14 +61,14 @@ jobs:
       id: artifact
       run: |
         echo ::set-output name=basename::${{ github.event.repository.name }}-${{ runner.OS }}
-        echo ::set-output name=extension::${{ (matrix.os == 'windows-latest' && 'zip') || 'tar.gz' }}
+        echo ::set-output name=extension::${{ (runner.os == 'Windows' && 'zip') || 'tar.gz' }}
 
     - name: Compress on Linux
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'Linux'
       run: tar zcvf ${{ steps.artifact.outputs.basename }}.${{ steps.artifact.outputs.extension }} ${{ github.event.repository.name }}
 
     - name: Compress on Windows
-      if: matrix.os == 'windows-latest'
+      if: runner.os == 'Windows'
       run: |
         Compress-Archive `
         -Path ${{ github.event.repository.name }} `
