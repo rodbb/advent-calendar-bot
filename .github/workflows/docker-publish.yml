@@ -7,7 +7,7 @@ name: Docker
 
 on:
   release:
-    types: [published, released]
+    types: [released]
 
 env:
   REGISTRY: ghcr.io
