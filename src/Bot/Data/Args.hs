@@ -7,5 +7,6 @@ data Args = Args
     summaryApiKey :: Maybe String,
     templateFilePath :: FilePath,
     cachePath :: FilePath,
+    insecure :: Bool,
     dryRun :: Bool
   }

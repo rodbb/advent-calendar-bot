@@ -67,7 +67,9 @@ instance ManageCache AppM where
     liftIO $ Txt.writeFile path $ Txt.pack (show cache)
 
 instance FetchFeed AppM where
-  fetchFeed = AppM . lift . ExceptT . Qiita.getCalendarFeed
+  fetchFeed uri = do
+    insecure <- asks insecure
+    hoistIOEither $ Qiita.getCalendarFeed insecure uri
 
 instance Summarize AppM where
   summarize t = do
@@ -75,7 +77,8 @@ instance Summarize AppM where
     mApiKey <- asks summaryApiKey
     apiUrl <- mApiUrl <? ("summaryApiUrl is required" :: Text)
     apiKey <- mApiKey <? ("summaryApiKey is required" :: Text)
-    AppM . lift $ callSummarizeApi apiUrl apiKey t
+    insecure <- asks insecure
+    AppM . lift $ callSummarizeApi insecure apiUrl apiKey t
 
 instance RenderMsg AppM where
   render templatePath viewModel = AppM $ do
@@ -86,5 +89,6 @@ instance RenderMsg AppM where
 instance PostMsg AppM where
   postMsg msg = AppM $ do
     hookUrl <- asks mttrWebhookUrl
-    ret <- lift $ ExceptT (Mttr.postMsg hookUrl msg)
+    insecure <- asks insecure
+    ret <- lift $ ExceptT (Mttr.postMsg insecure hookUrl msg)
     return (convertString ret)

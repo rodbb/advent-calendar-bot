@@ -29,8 +29,11 @@ dependencies:
 - base >= 4.7 && < 5
 - aeson
 - bytestring
+- connection
 - containers
 - feed
+- http-client
+- http-client-tls
 - mtl
 - modern-uri
 - mustache
