@@ -3,7 +3,7 @@
 
 module Bot.Api.Asahi where
 
-import Bot.Api.Util (ReqInfo, reqPost, useStr)
+import Bot.Api.Util (ReqInfo, reqPost, useStr, customHttpConfig)
 import qualified Bot.Util as Util
 import Control.Monad.Except (ExceptT)
 import Data.Aeson
@@ -19,8 +19,8 @@ import GHC.Generics (Generic)
 import qualified Network.HTTP.Req as Req
 import Prelude hiding (length)
 
-callSummarizeApi :: String -> String -> Text -> ExceptT Text IO Text
-callSummarizeApi url apiKey ec = do
+callSummarizeApi :: Bool -> String -> String -> Text -> ExceptT Text IO Text
+callSummarizeApi insecure url apiKey ec = do
   eUrlInfo <- Util.hoistMaybe "Invalid API URL" (useStr url)
   either post post eUrlInfo
   where
@@ -29,7 +29,8 @@ callSummarizeApi url apiKey ec = do
       let body = Req.ReqBodyJson ApiRequestBody {text = ec, length = 1000}
       let opts = opt <> Req.header "x-api-key" (B.pack apiKey)
       let req = reqPost (url, opts) body Req.jsonResponse
-      fold . result . Req.responseBody <$> Req.runReq Req.defaultHttpConfig req
+      httpConf <- customHttpConfig insecure
+      fold . result . Req.responseBody <$> Req.runReq httpConf req
 
 data ApiRequestBody = ApiRequestBody
   { text :: Text,

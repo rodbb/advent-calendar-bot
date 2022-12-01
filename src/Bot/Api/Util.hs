@@ -2,9 +2,12 @@
 
 module Bot.Api.Util where
 
+import Control.Monad.IO.Class (MonadIO)
 import Data.Aeson (FromJSON)
 import Data.Proxy (Proxy)
 import qualified Data.Text as Txt
+import Network.Connection (TLSSettings (TLSSettingsSimple))
+import Network.HTTP.Client.TLS (mkManagerSettings, newTlsManagerWith)
 import qualified Network.HTTP.Req as Req
 import Text.URI (mkURI)
 import qualified Text.URI as URI
@@ -30,3 +33,12 @@ reqPost ::
   Proxy res ->
   m res
 reqPost (url, opt) body res = Req.req Req.POST url body res opt
+
+customHttpConfig :: MonadIO m => Bool -> m Req.HttpConfig
+customHttpConfig insecure =
+  if insecure
+    then do
+      let managerSetting = mkManagerSettings (TLSSettingsSimple True False False) Nothing
+      m <- newTlsManagerWith managerSetting
+      return Req.defaultHttpConfig {Req.httpConfigAltManager = Just m}
+    else return Req.defaultHttpConfig

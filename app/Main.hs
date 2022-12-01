@@ -99,6 +99,12 @@ cliArgs =
               <> help "Feed Updated Date Cache File Path"
           )
         <*> switch
+          ( long "insecure"
+              <> short 'k'
+              <> showDefault
+              <> help "Allow insecure server connections when using SSL"
+          )
+        <*> switch
           ( long "dry-run"
               <> showDefault
               <> help "If true, will not post to Mattermost"
